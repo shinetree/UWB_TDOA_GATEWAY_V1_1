@@ -251,8 +251,8 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, signed char *pcTaskName)
    called if a stack overflow is detected. */
   __nop;
 }
-static uint64_t test1 ;
-static uint64_t test2;
+static uint64_t TRK_COUNTER ;
+static uint64_t SYNC_COUNTER;
 static uint64_t test3;
 void  w5500_recv_task_thead(void * arg)
 {
@@ -328,7 +328,7 @@ void  dw1000_task_thead(void * arg)
     
 	while (dw1000_task.isactive)
     {
-        vTaskDelay(10);
+//        vTaskDelay(10);
         memset(rx_buffer,0,sizeof(rx_buffer));
         task_tick_new = timer3_tick_ms; 
         time_slot += (task_tick_new - task_tick_old);
@@ -348,7 +348,7 @@ void  dw1000_task_thead(void * arg)
             { 
                 
             };
-            test2 ++;
+            SYNC_COUNTER ++;
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
             dwt_readtxtimestamp(t2);
             message[1]=Gateway_DDRL;
@@ -366,15 +366,16 @@ void  dw1000_task_thead(void * arg)
         }
         else
         {
-//            dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);	
+            dwt_setrxtimeout(50*1000);	
             dwt_rxenable(DWT_START_RX_IMMEDIATE);
             led_on(LED_ALL);
-            while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | (SYS_STATUS_RXPHE | SYS_STATUS_RXFCE | SYS_STATUS_RXRFSL | SYS_STATUS_RXSFDTO \
+            while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | (SYS_STATUS_RXPHE | SYS_STATUS_RXFCE | SYS_STATUS_RXRFSL | SYS_STATUS_RXSFDTO | SYS_STATUS_RXRFTO \
                                                             | SYS_STATUS_AFFREJ | SYS_STATUS_LDEERR))))
-            { };
+            {
+                __NOP;
+            };
             if (status_reg & SYS_STATUS_RXFCG)
             {
-                test1 ++;
                 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
                 if (frame_len <= 127)
                 {
@@ -396,7 +397,7 @@ void  dw1000_task_thead(void * arg)
                     }
                     message[11]=0xff;
                     num++;
-                Write_SOCK_Data_Buffer(0, message, 12);
+                    Write_SOCK_Data_Buffer(0, message, 12);
     //						USB_TxWrite(message,12);
                 }
                 else if(rx_buffer[4]==0xee&&rx_buffer[5]==0xee)
@@ -412,8 +413,10 @@ void  dw1000_task_thead(void * arg)
                         message[i]=t1[i-6];
                     }
                     message[11]=0xff;
-				USB_TxWrite(message,12);
-				Write_SOCK_Data_Buffer(0, message, 12);
+                    TRK_COUNTER ++;
+
+                    USB_TxWrite(message,12);
+                    Write_SOCK_Data_Buffer(0, message, 12);
                     num++;       //接收信息为定位帧时计数
                     tag_f=rx_buffer[8];   //定位标签发送频率
                 }
@@ -422,7 +425,7 @@ void  dw1000_task_thead(void * arg)
             else
             {
                 /* Clear RX error events in the DW1000 status register. */
-                dwt_write32bitreg(SYS_STATUS_ID, (SYS_STATUS_RXPHE | SYS_STATUS_RXFCE | SYS_STATUS_RXRFSL | SYS_STATUS_RXSFDTO \
+                dwt_write32bitreg(SYS_STATUS_ID, (SYS_STATUS_RXPHE | SYS_STATUS_RXFCE | SYS_STATUS_RXRFSL | SYS_STATUS_RXSFDTO | SYS_STATUS_RXRFTO\
                                                                  | SYS_STATUS_AFFREJ | SYS_STATUS_LDEERR));
                 num++;
             }
@@ -458,7 +461,7 @@ uint32_t w5500_task_start ()
 	
 int main(void)
 { 
-    peripherals_init();
+     peripherals_init();
 	delay_init();
 	uart_init(115200);	 //串口初始化为115200 	
     GPIO_Configuration();//初始化与LED连接的硬件接口
